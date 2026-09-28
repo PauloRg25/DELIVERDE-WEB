@@ -96,67 +96,83 @@
   margin: 0 0 14px;
 }
 
-.product {
+.menu {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.menu-item {
+  display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  border: 2px solid var(--verde-claro);
+  background: var(--verde-claro);
+  border-radius: 12px;
+  padding: 12px 14px;
+  text-align: left;
+  transition: all 0.15s ease;
 }
 
-.product__name {
-  margin: 0 0 4px;
-  font-size: 17px;
+.menu-item--active {
+  border-color: var(--verde-principal);
+  background: var(--white);
+  box-shadow: 0 2px 10px rgba(23, 107, 58, 0.18);
+}
+
+.menu-item__name {
+  flex: 1;
   font-weight: 700;
+  font-size: 15px;
+  color: var(--verde-oscuro);
 }
 
-.product__desc {
-  margin: 0;
-  font-size: 13px;
+.menu-item__weight {
+  font-size: 12px;
   color: #4a5c4f;
+  white-space: nowrap;
 }
 
-.product__price {
-  font-size: 20px;
+.menu-item__price {
   font-weight: 700;
+  font-size: 15px;
   color: var(--verde-principal);
   white-space: nowrap;
 }
 
-.options {
+.extra {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.option-group__label {
-  display: block;
-  font-size: 13px;
-  font-weight: 700;
-  color: #4a5c4f;
-  margin-bottom: 8px;
-}
-
-.toggle {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.toggle__btn {
+  align-items: center;
+  gap: 10px;
   border: 2px solid var(--verde-claro);
   background: var(--verde-claro);
-  color: var(--verde-oscuro);
-  font-weight: 600;
-  font-size: 14px;
-  padding: 10px 8px;
-  border-radius: 10px;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.toggle__btn--active {
-  border-color: var(--verde-principal);
-  background: var(--verde-principal);
-  color: var(--white);
+.extra--active {
+  border-color: var(--amarillo);
+  background: #fdf6e3;
+}
+
+.extra input {
+  accent-color: var(--verde-principal);
+  width: 18px;
+  height: 18px;
+}
+
+.extra__label {
+  flex: 1;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--verde-oscuro);
+}
+
+.extra__price {
+  font-weight: 700;
+  color: var(--verde-principal);
 }
 
 .quantity {

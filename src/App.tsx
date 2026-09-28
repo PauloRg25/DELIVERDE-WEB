@@ -1,8 +1,17 @@
 import { useMemo, useState } from 'react'
 import './App.css'
 
-const PRODUCT_PRICE = 4.0
-const PRODUCT_NAME = 'Tigrillo Mixto'
+const PRODUCTS = [
+  { id: 'queso', name: 'Tigrillo de Queso', price: 3.5, weight: '400 g' },
+  { id: 'chicharron', name: 'Tigrillo de Chicharrón', price: 3.5, weight: '400 g' },
+  { id: 'mixto', name: 'Tigrillo Mixto', price: 4.0, weight: '400 g' },
+  { id: 'estudiantil', name: 'Tigrillo Estudiantil', price: 2.0, weight: '200 g' },
+] as const
+
+type ProductId = (typeof PRODUCTS)[number]['id']
+
+const EXTRA_NAME = 'Extra seco de carne'
+const EXTRA_PRICE = 1.0
 
 const ZONES = [
   { id: 'norte', label: 'Norte de Quito', price: 1.5 },
@@ -15,13 +24,34 @@ type ZoneId = (typeof ZONES)[number]['id']
 const WHATSAPP_NUMBER = '593987249049' // 0987249049 en formato internacional Ecuador
 const BANK_ACCOUNT_NUMBER = '5463560900'
 
+const SHEETS_ENDPOINT =
+  'https://script.google.com/macros/s/AKfycbzVEy_tanimeo47m6vpcF8sAlNb4jU-3wo3RWf9_aqLY6ka1Yz0tAPNinxxi7HHsF97/exec'
+const SHEETS_TOKEN = 'DELIVERDE_2026_PEDIDOS'
+
 function formatMoney(value: number) {
   return `$${value.toFixed(2)}`
 }
 
+function registrarPedidoEnSheets(payload: Record<string, unknown>) {
+  // No-cors + text/plain evita el preflight de CORS en Apps Script; no se espera respuesta
+  try {
+    fetch(SHEETS_ENDPOINT, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    }).catch(() => {
+      // Silencioso: el pedido por WhatsApp no debe verse afectado
+    })
+  } catch {
+    // Silencioso: el pedido por WhatsApp no debe verse afectado
+  }
+}
+
 function App() {
-  const [conQueso, setConQueso] = useState(true)
-  const [conChicharron, setConChicharron] = useState(true)
+  const [productoId, setProductoId] = useState<ProductId>('mixto')
+  const [extraSeco, setExtraSeco] = useState(false)
   const [cantidad, setCantidad] = useState(1)
   const [zona, setZona] = useState<ZoneId | ''>('')
   const [nombre, setNombre] = useState('')
@@ -30,9 +60,13 @@ function App() {
   const [referencia, setReferencia] = useState('')
   const [copiado, setCopiado] = useState(false)
 
+  const producto = PRODUCTS.find((p) => p.id === productoId)!
   const zonaSeleccionada = ZONES.find((z) => z.id === zona)
 
-  const subtotal = useMemo(() => PRODUCT_PRICE * cantidad, [cantidad])
+  const subtotal = useMemo(
+    () => (producto.price + (extraSeco ? EXTRA_PRICE : 0)) * cantidad,
+    [producto, extraSeco, cantidad],
+  )
   const delivery = zonaSeleccionada?.price ?? 0
   const total = subtotal + delivery
 
@@ -60,16 +94,17 @@ function App() {
     const lines = [
       '🌿 NUEVO PEDIDO DELIVERDE',
       '',
-      `Producto: ${PRODUCT_NAME}`,
+      `Producto: ${producto.name}`,
+      `Peso: ${producto.weight}`,
       `Cantidad: ${cantidad}`,
-      `Queso: ${conQueso ? 'Con queso' : 'Sin queso'}`,
-      `Chicharrón: ${conChicharron ? 'Con chicharrón' : 'Sin chicharrón'}`,
       '',
+      ...(extraSeco ? [`${EXTRA_NAME}: Sí`, ''] : []),
       `Subtotal: ${formatMoney(subtotal)}`,
       `Delivery: ${formatMoney(delivery)}`,
       `TOTAL: ${formatMoney(total)}`,
       '',
-      `Cliente: ${nombre}`,
+      'Datos del cliente:',
+      `Nombre: ${nombre}`,
       `Teléfono: ${telefono}`,
       `Zona: ${zonaSeleccionada?.label ?? ''}`,
       `Dirección: ${direccion}`,
@@ -83,6 +118,23 @@ function App() {
   }
 
   const handleConfirmarPedido = () => {
+    registrarPedidoEnSheets({
+      token: SHEETS_TOKEN,
+      nombre,
+      telefono,
+      direccion,
+      referencia,
+      producto: producto.name,
+      peso: producto.weight,
+      cantidad,
+      extraSecoCarne: extraSeco ? 'Sí' : 'No',
+      zona: zonaSeleccionada?.label ?? '',
+      delivery,
+      subtotal,
+      total,
+      metodoPago: 'Transferencia Banco Pichincha',
+    })
+
     const mensaje = encodeURIComponent(buildWhatsappMessage())
     const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${mensaje}`
     window.open(url, '_blank', 'noopener,noreferrer')
@@ -99,7 +151,7 @@ function App() {
 
       <section className="hero">
         <p className="hero__eyebrow">Comida artesanal basada en verde</p>
-        <h1 className="hero__title">Tu Tigrillo Mixto, fresco y a domicilio</h1>
+        <h1 className="hero__title">Tu tigrillo favorito, fresco y a domicilio</h1>
         <p className="hero__subtitle">
           Prepara tu pedido en menos de un minuto y confírmalo por WhatsApp.
         </p>
@@ -110,61 +162,34 @@ function App() {
 
       <main className="content">
         <section id="producto" className="card">
-          <h2 className="card__title">1. Producto</h2>
-          <div className="product">
-            <div className="product__info">
-              <h3 className="product__name">{PRODUCT_NAME}</h3>
-              <p className="product__desc">
-                Nuestro clásico tigrillo artesanal, servido bien caliente.
-              </p>
-            </div>
-            <span className="product__price">{formatMoney(PRODUCT_PRICE)}</span>
+          <h2 className="card__title">1. Elige tu tigrillo</h2>
+          <div className="menu">
+            {PRODUCTS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`menu-item ${productoId === p.id ? 'menu-item--active' : ''}`}
+                onClick={() => setProductoId(p.id)}
+              >
+                <span className="menu-item__name">{p.name}</span>
+                <span className="menu-item__weight">{p.weight}</span>
+                <span className="menu-item__price">{formatMoney(p.price)}</span>
+              </button>
+            ))}
           </div>
         </section>
 
         <section className="card">
-          <h2 className="card__title">2. Personaliza tu pedido</h2>
-          <div className="options">
-            <div className="option-group">
-              <span className="option-group__label">Queso</span>
-              <div className="toggle">
-                <button
-                  type="button"
-                  className={`toggle__btn ${conQueso ? 'toggle__btn--active' : ''}`}
-                  onClick={() => setConQueso(true)}
-                >
-                  Con queso
-                </button>
-                <button
-                  type="button"
-                  className={`toggle__btn ${!conQueso ? 'toggle__btn--active' : ''}`}
-                  onClick={() => setConQueso(false)}
-                >
-                  Sin queso
-                </button>
-              </div>
-            </div>
-
-            <div className="option-group">
-              <span className="option-group__label">Chicharrón</span>
-              <div className="toggle">
-                <button
-                  type="button"
-                  className={`toggle__btn ${conChicharron ? 'toggle__btn--active' : ''}`}
-                  onClick={() => setConChicharron(true)}
-                >
-                  Con chicharrón
-                </button>
-                <button
-                  type="button"
-                  className={`toggle__btn ${!conChicharron ? 'toggle__btn--active' : ''}`}
-                  onClick={() => setConChicharron(false)}
-                >
-                  Sin chicharrón
-                </button>
-              </div>
-            </div>
-          </div>
+          <h2 className="card__title">2. Extra opcional</h2>
+          <label className={`extra ${extraSeco ? 'extra--active' : ''}`}>
+            <input
+              type="checkbox"
+              checked={extraSeco}
+              onChange={(e) => setExtraSeco(e.target.checked)}
+            />
+            <span className="extra__label">Agregar extra seco de carne</span>
+            <span className="extra__price">+{formatMoney(EXTRA_PRICE)}</span>
+          </label>
         </section>
 
         <section className="card">
@@ -296,19 +321,22 @@ function App() {
           <div className="summary">
             <div className="summary__row">
               <span>Producto</span>
-              <span>{PRODUCT_NAME}</span>
+              <span>{producto.name}</span>
             </div>
             <div className="summary__row">
-              <span>Personalización</span>
-              <span>
-                {conQueso ? 'Con queso' : 'Sin queso'},{' '}
-                {conChicharron ? 'Con chicharrón' : 'Sin chicharrón'}
-              </span>
+              <span>Peso</span>
+              <span>{producto.weight}</span>
             </div>
             <div className="summary__row">
               <span>Cantidad</span>
               <span>{cantidad}</span>
             </div>
+            {extraSeco && (
+              <div className="summary__row">
+                <span>{EXTRA_NAME}</span>
+                <span>Sí</span>
+              </div>
+            )}
             <div className="summary__row">
               <span>Subtotal</span>
               <span>{formatMoney(subtotal)}</span>
