@@ -21,6 +21,13 @@ const ZONES = [
 
 type ZoneId = (typeof ZONES)[number]['id']
 
+const DELIVERY_DAYS = [
+  { id: 'sabado', label: 'Sábado 3 de octubre' },
+  { id: 'domingo', label: 'Domingo 4 de octubre' },
+] as const
+
+type DeliveryDayId = (typeof DELIVERY_DAYS)[number]['id']
+
 const WHATSAPP_NUMBER = '593987249049' // 0987249049 en formato internacional Ecuador
 const BANK_ACCOUNT_NUMBER = '5463560900'
 
@@ -54,6 +61,7 @@ function App() {
   const [extraSeco, setExtraSeco] = useState(false)
   const [cantidad, setCantidad] = useState(1)
   const [zona, setZona] = useState<ZoneId | ''>('')
+  const [diaEntrega, setDiaEntrega] = useState<DeliveryDayId | ''>('')
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
   const [direccion, setDireccion] = useState('')
@@ -62,6 +70,7 @@ function App() {
 
   const producto = PRODUCTS.find((p) => p.id === productoId)!
   const zonaSeleccionada = ZONES.find((z) => z.id === zona)
+  const diaEntregaSeleccionado = DELIVERY_DAYS.find((day) => day.id === diaEntrega)
 
   const subtotal = useMemo(
     () => (producto.price + (extraSeco ? EXTRA_PRICE : 0)) * cantidad,
@@ -74,7 +83,8 @@ function App() {
     nombre.trim() !== '' &&
     telefono.trim() !== '' &&
     direccion.trim() !== '' &&
-    zona !== ''
+    zona !== '' &&
+    diaEntrega !== ''
 
   const handleCantidad = (delta: number) => {
     setCantidad((prev) => Math.min(20, Math.max(1, prev + delta)))
@@ -97,6 +107,7 @@ function App() {
       `Producto: ${producto.name}`,
       `Peso: ${producto.weight}`,
       `Cantidad: ${cantidad}`,
+      `Día de entrega: ${diaEntregaSeleccionado?.label ?? ''}`,
       '',
       ...(extraSeco ? [`${EXTRA_NAME}: Sí`, ''] : []),
       `Subtotal: ${formatMoney(subtotal)}`,
@@ -124,6 +135,7 @@ function App() {
       telefono,
       direccion,
       referencia,
+      diaEntrega: diaEntregaSeleccionado?.label ?? '',
       producto: producto.name,
       peso: producto.weight,
       cantidad,
@@ -240,7 +252,29 @@ function App() {
         </section>
 
         <section className="card">
-          <h2 className="card__title">5. Tus datos</h2>
+          <h2 className="card__title">5. Día de entrega</h2>
+          <div className="zones">
+            {DELIVERY_DAYS.map((day) => (
+              <label
+                key={day.id}
+                className={`zone ${diaEntrega === day.id ? 'zone--active' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="diaEntrega"
+                  value={day.id}
+                  checked={diaEntrega === day.id}
+                  onChange={() => setDiaEntrega(day.id)}
+                  required
+                />
+                <span className="zone__label">{day.label}</span>
+              </label>
+            ))}
+          </div>
+        </section>
+
+        <section className="card">
+          <h2 className="card__title">6. Tus datos</h2>
           <div className="form">
             <label className="field">
               <span className="field__label">Nombre</span>
@@ -286,7 +320,7 @@ function App() {
         </section>
 
         <section className="card">
-          <h2 className="card__title">6. Método de pago</h2>
+          <h2 className="card__title">7. Método de pago</h2>
           <div className="payment">
             <p className="payment__method">Transferencia bancaria</p>
             <div className="payment__details">
@@ -317,8 +351,12 @@ function App() {
         </section>
 
         <section className="card card--summary">
-          <h2 className="card__title">7. Resumen</h2>
+          <h2 className="card__title">8. Resumen</h2>
           <div className="summary">
+            <div className="summary__row">
+              <span>Día de entrega</span>
+              <span>{diaEntregaSeleccionado?.label ?? '—'}</span>
+            </div>
             <div className="summary__row">
               <span>Producto</span>
               <span>{producto.name}</span>
@@ -361,7 +399,7 @@ function App() {
           </button>
           {!datosCompletos && (
             <p className="summary__hint">
-              Completa tu zona de entrega, nombre, teléfono y dirección para continuar.
+              Selecciona el día de entrega y completa tu zona, nombre, teléfono y dirección para continuar.
             </p>
           )}
         </section>
