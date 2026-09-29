@@ -17,13 +17,15 @@ const ZONES = [
   { id: 'norte', label: 'Norte de Quito', price: 1.5 },
   { id: 'valles', label: 'Valles', price: 3.0 },
   { id: 'sur', label: 'Sur de Quito', price: 3.0 },
+  { id: 'no-aplica', label: 'No aplica', price: 0 },
 ] as const
 
 type ZoneId = (typeof ZONES)[number]['id']
 
 const DELIVERY_DAYS = [
-  { id: 'sabado', label: 'Sábado 3 de octubre' },
-  { id: 'domingo', label: 'Domingo 4 de octubre' },
+  { id: 'viernes', label: 'Viernes' },
+  { id: 'sabado', label: 'Sábado' },
+  { id: 'domingo', label: 'Domingo' },
 ] as const
 
 type DeliveryDayId = (typeof DELIVERY_DAYS)[number]['id']
@@ -139,12 +141,10 @@ function App() {
       producto: producto.name,
       peso: producto.weight,
       cantidad,
-      extraSecoCarne: extraSeco ? 'Sí' : 'No',
       zona: zonaSeleccionada?.label ?? '',
       delivery,
       subtotal,
       total,
-      metodoPago: 'Transferencia Banco Pichincha',
     })
 
     const mensaje = encodeURIComponent(buildWhatsappMessage())
@@ -381,7 +381,13 @@ function App() {
             </div>
             <div className="summary__row">
               <span>Delivery</span>
-              <span>{zonaSeleccionada ? formatMoney(delivery) : '—'}</span>
+              <span>
+                {zonaSeleccionada
+                  ? zonaSeleccionada.id === 'no-aplica'
+                    ? `No aplica (${formatMoney(delivery)})`
+                    : formatMoney(delivery)
+                  : '—'}
+              </span>
             </div>
             <div className="summary__row summary__row--total">
               <span>TOTAL</span>
