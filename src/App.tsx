@@ -28,6 +28,13 @@ const DELIVERY_DAYS = [
   { id: 'domingo', label: 'Domingo' },
 ] as const
 
+// Disponibilidad de días de entrega. Cambia a `true` para reactivar un día.
+const DELIVERY_DAY_AVAILABILITY: Record<(typeof DELIVERY_DAYS)[number]['id'], boolean> = {
+  viernes: true,
+  sabado: false,
+  domingo: false,
+}
+
 type DeliveryDayId = (typeof DELIVERY_DAYS)[number]['id']
 
 const WHATSAPP_NUMBER = '593987249049' // 0987249049 en formato internacional Ecuador
@@ -36,6 +43,7 @@ const BANK_ACCOUNT_NUMBER = '5463560900'
 const SHEETS_ENDPOINT =
   'https://script.google.com/macros/s/AKfycbzVEy_tanimeo47m6vpcF8sAlNb4jU-3wo3RWf9_aqLY6ka1Yz0tAPNinxxi7HHsF97/exec'
 const SHEETS_TOKEN = 'DELIVERDE_2026_PEDIDOS'
+const GOOGLE_MAPS_URL = 'https://www.google.com/maps'
 
 function formatMoney(value: number) {
   return `$${value.toFixed(2)}`
@@ -68,6 +76,7 @@ function App() {
   const [telefono, setTelefono] = useState('')
   const [direccion, setDireccion] = useState('')
   const [referencia, setReferencia] = useState('')
+  const [ubicacion, setUbicacion] = useState('')
   const [copiado, setCopiado] = useState(false)
 
   const producto = PRODUCTS.find((p) => p.id === productoId)!
@@ -87,6 +96,8 @@ function App() {
     direccion.trim() !== '' &&
     zona !== '' &&
     diaEntrega !== ''
+
+  const ubicacionUrl = /^https?:\/\//i.test(ubicacion.trim()) ? ubicacion.trim() : ''
 
   const handleCantidad = (delta: number) => {
     setCantidad((prev) => Math.min(20, Math.max(1, prev + delta)))
@@ -120,7 +131,8 @@ function App() {
       `Nombre: ${nombre}`,
       `Teléfono: ${telefono}`,
       `Zona: ${zonaSeleccionada?.label ?? ''}`,
-      `Dirección: ${direccion}`,
+      `Dirección de entrega: ${direccion}`,
+      `Ubicación: ${ubicacion.trim() || '-'}`,
       `Referencia: ${referencia || '-'}`,
       '',
       'Método de pago: Transferencia Banco Pichincha',
@@ -136,6 +148,7 @@ function App() {
       nombre,
       telefono,
       direccion,
+      ubicacionGoogleMaps: ubicacion.trim(),
       referencia,
       diaEntrega: diaEntregaSeleccionado?.label ?? '',
       producto: producto.name,
@@ -257,7 +270,7 @@ function App() {
             {DELIVERY_DAYS.map((day) => (
               <label
                 key={day.id}
-                className={`zone ${diaEntrega === day.id ? 'zone--active' : ''}`}
+                className={`zone ${diaEntrega === day.id ? 'zone--active' : ''} ${DELIVERY_DAY_AVAILABILITY[day.id] ? '' : 'zone--disabled'}`}
               >
                 <input
                   type="radio"
@@ -265,9 +278,15 @@ function App() {
                   value={day.id}
                   checked={diaEntrega === day.id}
                   onChange={() => setDiaEntrega(day.id)}
+                  disabled={!DELIVERY_DAY_AVAILABILITY[day.id]}
                   required
                 />
-                <span className="zone__label">{day.label}</span>
+                <span className="zone__label">
+                  {DELIVERY_DAY_AVAILABILITY[day.id] ? '🟢' : '⚪'} {day.label}
+                </span>
+                <span className="zone__price">
+                  {DELIVERY_DAY_AVAILABILITY[day.id] ? 'Disponible' : 'No disponible esta semana'}
+                </span>
               </label>
             ))}
           </div>
@@ -297,13 +316,32 @@ function App() {
               />
             </label>
             <label className="field">
-              <span className="field__label">Dirección</span>
+              <span className="field__label">Dirección de entrega</span>
               <input
                 className="field__input"
                 type="text"
                 value={direccion}
                 onChange={(e) => setDireccion(e.target.value)}
-                placeholder="Calle, número, sector"
+                placeholder="Ingresa tu dirección de entrega"
+              />
+            </label>
+            <a
+              className="map-btn"
+              href={GOOGLE_MAPS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              📍 Elegir ubicación en Google Maps
+            </a>
+            <label className="field">
+              <span className="field__label">Ubicación de Google Maps</span>
+              <input
+                className="field__input"
+                type="url"
+                inputMode="url"
+                value={ubicacion}
+                onChange={(e) => setUbicacion(e.target.value)}
+                placeholder="Pega aquí el enlace de Google Maps"
               />
             </label>
             <label className="field">
@@ -356,6 +394,27 @@ function App() {
             <div className="summary__row">
               <span>Día de entrega</span>
               <span>{diaEntregaSeleccionado?.label ?? '—'}</span>
+            </div>
+            <div className="summary__row">
+              <span>Dirección de entrega</span>
+              <span>{direccion.trim() || '—'}</span>
+            </div>
+            <div className="summary__row">
+              <span>Ubicación</span>
+              <span>
+                {ubicacionUrl ? (
+                  <a
+                    className="map-btn map-btn--small"
+                    href={ubicacionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    📍 Ver ubicación
+                  </a>
+                ) : (
+                  ubicacion.trim() || '—'
+                )}
+              </span>
             </div>
             <div className="summary__row">
               <span>Producto</span>
