@@ -434,3 +434,25 @@
   min-height: 40px;
   padding: 0.4rem 0.8rem;
 }
+
+.menu-item {
+  flex-wrap: wrap;
+}
+
+.menu-item__name {
+  min-width: 140px;
+}
+
+.quantity--inline {
+  gap: 14px;
+  margin-left: auto;
+}
+
+.quantity--inline .quantity__value {
+  font-size: 20px;
+}
+
+.extra {
+  flex-wrap: wrap;
+  cursor: default;
+}

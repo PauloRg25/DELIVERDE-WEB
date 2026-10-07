@@ -12,6 +12,7 @@ type ProductId = (typeof PRODUCTS)[number]['id']
 
 const EXTRA_NAME = 'Extra seco de carne'
 const EXTRA_PRICE = 1.0
+const MAX_QTY = 20
 
 const ZONES = [
   { id: 'norte', label: 'Norte de Quito', price: 1.5 },
@@ -67,9 +68,13 @@ function registrarPedidoEnSheets(payload: Record<string, unknown>) {
 }
 
 function App() {
-  const [productoId, setProductoId] = useState<ProductId>('mixto')
-  const [extraSeco, setExtraSeco] = useState(false)
-  const [cantidad, setCantidad] = useState(1)
+  const [cantidades, setCantidades] = useState<Record<ProductId, number>>({
+    queso: 0,
+    chicharron: 0,
+    mixto: 0,
+    estudiantil: 0,
+  })
+  const [extraSecoCantidad, setExtraSecoCantidad] = useState(0)
   const [zona, setZona] = useState<ZoneId | ''>('')
   const [diaEntrega, setDiaEntrega] = useState<DeliveryDayId | ''>('')
   const [nombre, setNombre] = useState('')
@@ -79,18 +84,27 @@ function App() {
   const [ubicacion, setUbicacion] = useState('')
   const [copiado, setCopiado] = useState(false)
 
-  const producto = PRODUCTS.find((p) => p.id === productoId)!
   const zonaSeleccionada = ZONES.find((z) => z.id === zona)
   const diaEntregaSeleccionado = DELIVERY_DAYS.find((day) => day.id === diaEntrega)
 
-  const subtotal = useMemo(
-    () => (producto.price + (extraSeco ? EXTRA_PRICE : 0)) * cantidad,
-    [producto, extraSeco, cantidad],
+  const lineasProductos = useMemo(
+    () =>
+      PRODUCTS.filter((p) => cantidades[p.id] > 0).map((p) => ({
+        name: p.name,
+        weight: p.weight,
+        cantidad: cantidades[p.id],
+        total: p.price * cantidades[p.id],
+      })),
+    [cantidades],
   )
+  const totalTigrillos = lineasProductos.reduce((acc, l) => acc + l.cantidad, 0)
+  const extraSecoTotal = EXTRA_PRICE * extraSecoCantidad
+  const subtotal = lineasProductos.reduce((acc, l) => acc + l.total, 0) + extraSecoTotal
   const delivery = zonaSeleccionada?.price ?? 0
   const total = subtotal + delivery
 
   const datosCompletos =
+    subtotal > 0 &&
     nombre.trim() !== '' &&
     telefono.trim() !== '' &&
     direccion.trim() !== '' &&
@@ -99,8 +113,15 @@ function App() {
 
   const ubicacionUrl = /^https?:\/\//i.test(ubicacion.trim()) ? ubicacion.trim() : ''
 
-  const handleCantidad = (delta: number) => {
-    setCantidad((prev) => Math.min(20, Math.max(1, prev + delta)))
+  const handleCantidadProducto = (id: ProductId, delta: number) => {
+    setCantidades((prev) => ({
+      ...prev,
+      [id]: Math.min(MAX_QTY, Math.max(0, prev[id] + delta)),
+    }))
+  }
+
+  const handleCantidadExtra = (delta: number) => {
+    setExtraSecoCantidad((prev) => Math.min(MAX_QTY, Math.max(0, prev + delta)))
   }
 
   const handleCopiarCuenta = async () => {
@@ -117,12 +138,15 @@ function App() {
     const lines = [
       '🌿 NUEVO PEDIDO DELIVERDE',
       '',
-      `Producto: ${producto.name}`,
-      `Peso: ${producto.weight}`,
-      `Cantidad: ${cantidad}`,
+      'Productos:',
+      ...lineasProductos.map(
+        (l) => `${l.name} (${l.weight}) × ${l.cantidad} = ${formatMoney(l.total)}`,
+      ),
+      ...(extraSecoCantidad > 0
+        ? [`${EXTRA_NAME} × ${extraSecoCantidad} = ${formatMoney(extraSecoTotal)}`]
+        : []),
       `Día de entrega: ${diaEntregaSeleccionado?.label ?? ''}`,
       '',
-      ...(extraSeco ? [`${EXTRA_NAME}: Sí`, ''] : []),
       `Subtotal: ${formatMoney(subtotal)}`,
       `Delivery: ${formatMoney(delivery)}`,
       `TOTAL: ${formatMoney(total)}`,
@@ -151,9 +175,19 @@ function App() {
       ubicacionGoogleMaps: ubicacion.trim(),
       referencia,
       diaEntrega: diaEntregaSeleccionado?.label ?? '',
-      producto: producto.name,
-      peso: producto.weight,
-      cantidad,
+      producto: [
+        ...lineasProductos.map((l) => `${l.name} × ${l.cantidad}`),
+        ...(extraSecoCantidad > 0 ? [`${EXTRA_NAME} × ${extraSecoCantidad}`] : []),
+      ].join(' | '),
+      peso: lineasProductos.map((l) => `${l.weight} × ${l.cantidad}`).join(' | '),
+      cantidad: totalTigrillos,
+      extraSecoCantidad,
+      items: lineasProductos.map((l) => ({
+        producto: l.name,
+        peso: l.weight,
+        cantidad: l.cantidad,
+        total: l.total,
+      })),
       zona: zonaSeleccionada?.label ?? '',
       delivery,
       subtotal,
@@ -187,63 +221,73 @@ function App() {
 
       <main className="content">
         <section id="producto" className="card">
-          <h2 className="card__title">1. Elige tu tigrillo</h2>
+          <h2 className="card__title">1. Elige tus productos</h2>
           <div className="menu">
             {PRODUCTS.map((p) => (
-              <button
+              <div
                 key={p.id}
-                type="button"
-                className={`menu-item ${productoId === p.id ? 'menu-item--active' : ''}`}
-                onClick={() => setProductoId(p.id)}
+                className={`menu-item ${cantidades[p.id] > 0 ? 'menu-item--active' : ''}`}
               >
                 <span className="menu-item__name">{p.name}</span>
                 <span className="menu-item__weight">{p.weight}</span>
                 <span className="menu-item__price">{formatMoney(p.price)}</span>
-              </button>
+                <div className="quantity quantity--inline">
+                  <button
+                    type="button"
+                    className="quantity__btn"
+                    onClick={() => handleCantidadProducto(p.id, -1)}
+                    disabled={cantidades[p.id] <= 0}
+                    aria-label={`Disminuir cantidad de ${p.name}`}
+                  >
+                    −
+                  </button>
+                  <span className="quantity__value">{cantidades[p.id]}</span>
+                  <button
+                    type="button"
+                    className="quantity__btn"
+                    onClick={() => handleCantidadProducto(p.id, 1)}
+                    disabled={cantidades[p.id] >= MAX_QTY}
+                    aria-label={`Aumentar cantidad de ${p.name}`}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </section>
 
         <section className="card">
           <h2 className="card__title">2. Extra opcional</h2>
-          <label className={`extra ${extraSeco ? 'extra--active' : ''}`}>
-            <input
-              type="checkbox"
-              checked={extraSeco}
-              onChange={(e) => setExtraSeco(e.target.checked)}
-            />
-            <span className="extra__label">Agregar extra seco de carne</span>
-            <span className="extra__price">+{formatMoney(EXTRA_PRICE)}</span>
-          </label>
-        </section>
-
-        <section className="card">
-          <h2 className="card__title">3. Cantidad</h2>
-          <div className="quantity">
-            <button
-              type="button"
-              className="quantity__btn"
-              onClick={() => handleCantidad(-1)}
-              disabled={cantidad <= 1}
-              aria-label="Disminuir cantidad"
-            >
-              −
-            </button>
-            <span className="quantity__value">{cantidad}</span>
-            <button
-              type="button"
-              className="quantity__btn"
-              onClick={() => handleCantidad(1)}
-              disabled={cantidad >= 20}
-              aria-label="Aumentar cantidad"
-            >
-              +
-            </button>
+          <div className={`extra ${extraSecoCantidad > 0 ? 'extra--active' : ''}`}>
+            <span className="extra__label">{EXTRA_NAME}</span>
+            <span className="extra__price">{formatMoney(EXTRA_PRICE)}</span>
+            <div className="quantity quantity--inline">
+              <button
+                type="button"
+                className="quantity__btn"
+                onClick={() => handleCantidadExtra(-1)}
+                disabled={extraSecoCantidad <= 0}
+                aria-label={`Disminuir cantidad de ${EXTRA_NAME}`}
+              >
+                −
+              </button>
+              <span className="quantity__value">{extraSecoCantidad}</span>
+              <button
+                type="button"
+                className="quantity__btn"
+                onClick={() => handleCantidadExtra(1)}
+                disabled={extraSecoCantidad >= MAX_QTY}
+                aria-label={`Aumentar cantidad de ${EXTRA_NAME}`}
+              >
+                +
+              </button>
+            </div>
           </div>
         </section>
 
         <section className="card">
-          <h2 className="card__title">4. Zona de entrega</h2>
+          <h2 className="card__title">3. Zona de entrega</h2>
           <div className="zones">
             {ZONES.map((z) => (
               <label
@@ -265,7 +309,7 @@ function App() {
         </section>
 
         <section className="card">
-          <h2 className="card__title">5. Día de entrega</h2>
+          <h2 className="card__title">4. Día de entrega</h2>
           <div className="zones">
             {DELIVERY_DAYS.map((day) => (
               <label
@@ -293,7 +337,7 @@ function App() {
         </section>
 
         <section className="card">
-          <h2 className="card__title">6. Tus datos</h2>
+          <h2 className="card__title">5. Tus datos</h2>
           <div className="form">
             <label className="field">
               <span className="field__label">Nombre</span>
@@ -358,7 +402,7 @@ function App() {
         </section>
 
         <section className="card">
-          <h2 className="card__title">7. Método de pago</h2>
+          <h2 className="card__title">6. Método de pago</h2>
           <div className="payment">
             <p className="payment__method">Transferencia bancaria</p>
             <div className="payment__details">
@@ -389,7 +433,7 @@ function App() {
         </section>
 
         <section className="card card--summary">
-          <h2 className="card__title">8. Resumen</h2>
+          <h2 className="card__title">7. Resumen</h2>
           <div className="summary">
             <div className="summary__row">
               <span>Día de entrega</span>
@@ -416,22 +460,20 @@ function App() {
                 )}
               </span>
             </div>
-            <div className="summary__row">
-              <span>Producto</span>
-              <span>{producto.name}</span>
-            </div>
-            <div className="summary__row">
-              <span>Peso</span>
-              <span>{producto.weight}</span>
-            </div>
-            <div className="summary__row">
-              <span>Cantidad</span>
-              <span>{cantidad}</span>
-            </div>
-            {extraSeco && (
+            {lineasProductos.map((l) => (
+              <div className="summary__row" key={l.name}>
+                <span>
+                  {l.name} × {l.cantidad}
+                </span>
+                <span>{formatMoney(l.total)}</span>
+              </div>
+            ))}
+            {extraSecoCantidad > 0 && (
               <div className="summary__row">
-                <span>{EXTRA_NAME}</span>
-                <span>Sí</span>
+                <span>
+                  {EXTRA_NAME} × {extraSecoCantidad}
+                </span>
+                <span>{formatMoney(extraSecoTotal)}</span>
               </div>
             )}
             <div className="summary__row">
@@ -464,7 +506,7 @@ function App() {
           </button>
           {!datosCompletos && (
             <p className="summary__hint">
-              Selecciona el día de entrega y completa tu zona, nombre, teléfono y dirección para continuar.
+              Elige al menos un producto, el día de entrega y completa tu zona, nombre, teléfono y dirección para continuar.
             </p>
           )}
         </section>
